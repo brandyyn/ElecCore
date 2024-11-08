@@ -1,12 +1,11 @@
 package elec332.core.inventory.widget;
 
-import com.mojang.blaze3d.matrix.MatrixStack;
-import elec332.core.api.inventory.IHasProgressBar;
-import elec332.core.client.util.GuiDraw;
-import elec332.core.inventory.window.Window;
+import elec332.core.inventory.IHasProgressBar;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.inventory.ICrafting;
 import net.minecraft.util.ResourceLocation;
 
-import javax.annotation.Nonnull;
+import java.util.List;
 
 /**
  * Created by Elec332 on 15-8-2015.
@@ -24,9 +23,9 @@ public class WidgetProgressArrow extends Widget {
     private int lastProgress;
 
     @Override
-    public void detectAndSendChanges(Iterable<IWidgetListener> crafters) {
+    public void detectAndSendChanges(List<ICrafting> crafters) {
         int progress = iHasProgressBar.getProgress();
-        if (lastProgress != progress) {
+        if (lastProgress != progress){
             sendProgressBarUpdate(crafters, progress);
             lastProgress = progress;
         }
@@ -38,23 +37,20 @@ public class WidgetProgressArrow extends Widget {
     }
 
     @Override
-    public void draw(Window gui, @Nonnull MatrixStack matrixStack, int guiX, int guiY, double mouseX, double mouseY, float partialTicks) {
+    public void draw(Gui gui, int guiX, int guiY, int mouseX, int mouseY) {
         float progress = iHasProgressBar.getProgressScaled(lastProgress);
-        if (progress > 1) {
+        if (progress > 1)
             progress = 1;
-        }
-        if (progress < 0) {
+        if (progress < 0)
             progress = 0;
-        }
         bindTexture(new ResourceLocation("eleccore", "progressbars.png"));
-        int fullArrow = (int) (23 * progress);
-        if (right) {
-            GuiDraw.drawTexturedModalRect(guiX + x, guiY + y, 0, 0, width, height);
-            GuiDraw.drawTexturedModalRect(guiX + x, guiY + y, 0, 16, fullArrow, height);
+        int fullArrow = (int)(23*progress);
+        if (right){
+            gui.drawTexturedModalRect(guiX + x, guiY + y, 0, 0, width, height);
+            gui.drawTexturedModalRect(guiX + x, guiY + y, 0, 16, fullArrow, height);
         } else {
-            GuiDraw.drawTexturedModalRect(guiX + x, guiY + y, 23, 16, width, height);
-            GuiDraw.drawTexturedModalRect(guiX + x, guiY + y, 23, 0, 23 - fullArrow, height);
+            gui.drawTexturedModalRect(guiX + x, guiY + y, 23, 16, width, height);
+            gui.drawTexturedModalRect(guiX + x, guiY + y, 23, 0, 23-fullArrow, height);
         }
     }
-
 }

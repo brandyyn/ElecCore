@@ -1,79 +1,74 @@
 buildscript {
     repositories {
-        gradlePluginPortal()
+        mavenCentral()
+        maven {
+            name = "forge"
+            url = "https://maven.minecraftforge.net"
+        }
+        maven {
+            name = "sonatype"
+            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
     }
     dependencies {
-        classpath 'gradle.plugin.nl.elec332.gradle.minecraft:GradleModDev:0.2.2-Beta'
+        classpath ('com.anatawa12.forge:ForgeGradle:1.2-1.1.+') {
+
+    changing = true
+
+}
     }
 }
 
-apply plugin: "nl.elec332.gradle.minecraft.moddev"
-apply plugin: "nl.elec332.gradle.minecraft.modmaven"
+apply plugin: 'forge'
 
-group = "nl.elec332.core"
+version = "1.0"
+group= "com.yourname.modid" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
+archivesBaseName = "modid"
+targetCompatibility = sourceCompatibility = JavaVersion.VERSION_1_8
 
-modSettings {
-    modName = "ElecCore"
-    modId = "eleccore"
-    basePackage = "elec332.core"
-
-    createDeobf = true
-    addWailaMaven = true
+minecraft {
+    version = "1.7.10-10.13.4.1614-1.7.10"
+    runDir = "eclipse"
 }
 
-generateToml {
-    mods {
-        eleccore {
-            description = "Provides core functionality for Elec's Mods"
-            dependencies {
-                forestry {
-                    mandatory = false
-                    ordering = "AFTER"
-                    versionRange = "(,1,)" //Accepts anything (hopefully)
-                }
-            }
-        }
-        eleccoreloader {
-            displayName = "ElecCoreLoader"
-            description = "Loads the main ElecCore components"
-        }
-    }
+tasks.withType(JavaCompile) {
+options.encoding = 'UTF-8'
 }
+
+
 
 dependencies {
+    // you may put jars on which you depend on in ./libs
+    // or you may define them like so..
+    //compile "some.group:artifact:version:classifier"
+    //compile "some.group:artifact:version"
+      
+    // real examples
+    //compile 'com.mod-buildcraft:buildcraft:6.0.8:dev'  // adds buildcraft to the dev env
+    //compile 'com.googlecode.efficient-java-matrix-library:ejml:0.24' // adds ejml to the dev env
 
-	//WAILA
-    compileOnly "mcp.mobius.waila:Hwyla:${config.WAILA_version}:api"
-    modRuntime "mcp.mobius.waila:Hwyla:${config.WAILA_version}"
-	
-	//JEI
-    compileOnly "mezz.jei:jei-${config.jei_version}:api"
-    modRuntime "mezz.jei:jei-${config.jei_version}"
-
-    compileOnly "mcjty.theoneprobe:TheOneProbe-${config.top_version}:api"
+    // for more info...
+    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
+    // http://www.gradle.org/docs/current/userguide/dependency_management.html
+	compile fileTree(dir: 'libs', include: ['*jar'])
 }
 
-jar {
-    manifest {
+processResources
+{
+    // this will ensure that this task is redone when the versions change.
+    inputs.property "version", project.version
+    inputs.property "mcversion", project.minecraft.version
 
-        attributes([
-                'Specification-Title': 'ElecCoreAPI',
-                'Specification-Version': '2.0'
-        ] as LinkedHashMap, 'elec332.core.api')
-
+    // replace stuff in mcmod.info, nothing else
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+                
+        // replace version and mcversion
+        expand 'version':project.version, 'mcversion':project.minecraft.version
     }
-}
-
-
-modMaven {
-    githubUrl = "https://github.com/Elecs-Mods/ElecCore"
-    forceLicense = false
-    
-    developer {
-        id "Elec332"
-        name "Elec332"
-        roles {
-            role "developer"
-        }
+        
+    // copy everything else, thats not the mcmod.info
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
     }
 }

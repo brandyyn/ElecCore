@@ -1,119 +1,182 @@
 package elec332.core.config;
 
-import com.electronwill.nightconfig.core.CommentedConfig;
-import com.electronwill.nightconfig.core.UnmodifiableCommentedConfig;
-import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import com.google.common.base.Preconditions;
-import elec332.core.util.ConstructorPointer;
-import elec332.core.util.FMLHelper;
-import elec332.core.util.MethodPointer;
-import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.ModLoadingStage;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.javafmlmod.FMLModContainer;
-import net.minecraftforge.fml.loading.FMLPaths;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import elec332.core.java.ReflectionHelper;
+import net.minecraftforge.common.config.Configuration;
+import org.lwjgl.Sys;
 
-import javax.annotation.Nonnull;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.List;
 
 /**
- * Created by Elec332 on 29-12-2019
+ * Created by Elec332 on 12-4-2015.
  */
-public class ConfigWrapper extends AbstractFileConfigWrapper {
+public class ConfigWrapper {
 
-    public ConfigWrapper(@Nonnull Object mod) {
-        this(Preconditions.checkNotNull(FMLHelper.getModContainer(mod)));
+    public ConfigWrapper(Configuration configuration){
+        this.configuration = configuration;
+        this.instances = Lists.newArrayList();
+        this.hasInit = false;
+        this.categoryDataList = Lists.newArrayList();
+        this.categories = Lists.newArrayList();
     }
 
-    public ConfigWrapper(@Nonnull Object mod, @Nonnull ModConfig.Type type) {
-        this(Preconditions.checkNotNull(FMLHelper.getModContainer(mod)), type);
+    private Configuration configuration;
+    private List<Object> instances;
+    private boolean hasInit;
+    private List<CategoryData> categoryDataList;
+    private List<String> categories;
+
+    public void registerConfig(Object o){
+        if (!hasInit)
+            this.instances.add(o);
+        else throw new RuntimeException("You cannot register configs after init");
     }
 
-    public ConfigWrapper(@Nonnull Object mod, @Nonnull ModConfig.Type type, @Nonnull String fileName) {
-        this(Preconditions.checkNotNull(FMLHelper.getModContainer(mod)), type, fileName + TOML_EXTENSION);
-    }
-
-    public ConfigWrapper(@Nonnull ModContainer mod) {
-        this(mod, ModConfig.Type.COMMON, mod.getModId() + TOML_EXTENSION);
-    }
-
-    public ConfigWrapper(@Nonnull ModContainer mod, @Nonnull ModConfig.Type type) {
-        this(mod, type, mod.getModId() + "-" + type.extension() + TOML_EXTENSION);
-    }
-
-    public ConfigWrapper(@Nonnull ModContainer mod, @Nonnull ModConfig.Type type, @Nonnull String fileName) {
-        this.mod = Preconditions.checkNotNull(mod);
-        this.type = Preconditions.checkNotNull(type);
-        this.fileName = Preconditions.checkNotNull(fileName);
-        this.logger = LogManager.getLogger(mod.getModInfo().getDisplayName());
-    }
-
-    private final ModContainer mod;
-    private final String fileName;
-    private final ModConfig.Type type;
-    private final Logger logger;
-    private ModConfig config;
-
-    @Override
-    protected void registerConfigSpec() {
-        if (FMLHelper.hasReachedState(ModLoadingStage.COMPLETE)) {
-            throw new IllegalStateException();
+    public ConfigWrapper setCategoryData(String category, String description){
+        for (CategoryData cat: this.categoryDataList){
+            if (category.equals(cat.getCategory()))
+                throw new IllegalArgumentException();
         }
-        config = new ModConfig(type, getSpec(), mod, fileName);
-        mod.addConfig(config);
-        logger.info("Registered config: " + fileName);
-        if (FMLHelper.hasFMLModContainer(mod)) {
-            FMLModContainer mc = FMLHelper.getFMLModContainer(mod);
-            mc.getEventBus().addListener((Consumer<? extends ModConfig.Loading>) cfgLoad -> {
-                logger.info("Loading config: " + fileName);
-                runLoadTasks();
-            });
-            mc.getEventBus().addListener((Consumer<? extends ModConfig.Reloading>) cfgLoad -> {
-                logger.info("Reloading config: " + fileName);
-                runLoadTasks();
-            });
-        }
-        if (FMLHelper.hasReachedState(ModLoadingStage.COMMON_SETUP)) {
-            logger.info("Immediately loading config...");
-            final CommentedFileConfig configData = config.getHandler()
-                    .reader(FMLPaths.CONFIGDIR.get())
-                    .apply(config);
-            try {
-                getSpec().correct(configData);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to parse config!", e);
+        this.categoryDataList.add(new CategoryData(category, description));
+        addRegisteredCategory(category);
+        return this;
+    }
+
+    private void addRegisteredCategory(String category){
+        if (!categories.contains(category.toLowerCase()))
+            this.categories.add(category.toLowerCase());
+    }
+
+    public List<String> getRegisteredCategories() {
+        return ImmutableList.copyOf(categories);
+    }
+
+    public boolean hasBeenLoaded() {
+        return hasInit;
+    }
+
+    public void registerConfigWithInnerClasses(Object obj){
+        registerConfig(obj);
+        for (Class<?> clazz : obj.getClass().getDeclaredClasses()){
+            if (!clazz.isInterface()){
+                try {
+                    registerConfigWithInnerClasses(clazz.getConstructor().newInstance());
+                } catch (Exception e){
+                    throw new RuntimeException("Error registering config: "+clazz.getName());
+                }
             }
-            setConfig.accept(config, configData);
-            sendLoadingEvent.accept(mod, config);
-            config.save();
         }
     }
 
-    @Override
-    protected ModConfig.Type getConfigType() {
-        return type;
+    public Configuration getConfiguration() {
+        return this.configuration;
     }
 
-    @Override
-    public UnmodifiableCommentedConfig getRawReadOnlyData() {
-        return config == null ? null : Preconditions.checkNotNull(config.getConfigData()).unmodifiable();
+    public void refresh(){
+        configuration.load();
+        if (!this.hasInit)
+            this.hasInit = true;
+        for (CategoryData categoryData : categoryDataList){
+            configuration.setCategoryComment(categoryData.getCategory(), categoryData.getDescription());
+        }
+        for (Object o : instances){
+            Class objClass = o.getClass();
+            String classCategory = Configuration.CATEGORY_GENERAL;
+            if (objClass.isAnnotationPresent(Configurable.Class.class)){
+                Configurable.Class configClass = (Configurable.Class) objClass.getAnnotation(Configurable.Class.class);
+                if (configClass.inherit() == Configurable.Inherit.TRUE){
+                    Class[] classes = ReflectionHelper.getAllTillMainClass(objClass);
+                    String s = "";
+                    for (Class clazz : classes){
+                        if (clazz.isAnnotationPresent(Configurable.Class.class)){
+                            if (!s.equals("")){
+                                s += ".";
+                            }
+                            String s1 = ((Configurable.Class) clazz.getAnnotation(Configurable.Class.class)).category();
+                            s += s1.equals(Configuration.CATEGORY_GENERAL)?clazz.getSimpleName():s1;
+                        }
+                    }
+                    classCategory = s;
+                } else {
+                    classCategory = configClass.category();
+                }
+                String comment = configClass.comment();
+                //classCategory = classCategory.toLowerCase();
+                if (!comment.equals("")) {
+                    configuration.setCategoryComment(classCategory, comment);
+                }
+            }
+            for (Field field : objClass.getDeclaredFields()){
+                try {
+                    boolean oldAccess = field.isAccessible();
+                    field.setAccessible(true);
+                    if (field.isAnnotationPresent(Configurable.class)) {
+                        Configurable configurable = field.getAnnotation(Configurable.class);
+                        Object oldValue = field.get(o);
+                        String category = configurable.category();
+                        if (category.equals(Configuration.CATEGORY_GENERAL)){
+                            category = classCategory;
+                        }
+                        addRegisteredCategory(category);
+                        if (field.getType().isAssignableFrom(Integer.TYPE)) {
+                            field.set(o, configuration.getInt(field.getName(), category, (Integer) oldValue, configurable.minValue(), configurable.maxValue(), configurable.comment()));
+                        } else if (field.getType().isAssignableFrom(Boolean.TYPE)) {
+                            field.set(o, configuration.getBoolean(field.getName(), category, (Boolean) oldValue, configurable.comment()));
+                        } else if (field.getType().isAssignableFrom(String.class)){
+                            if (configurable.validStrings().length > 0)
+                                field.set(o, configuration.getString(field.getName(), category, (String) oldValue, configurable.comment(), configurable.validStrings()));
+                            else
+                                field.set(o, configuration.getString(field.getName(), category, (String) oldValue, configurable.comment()));
+                        }
+                    }
+                    field.setAccessible(oldAccess);
+                } catch (Throwable t) {
+                    throw new RuntimeException(t);
+                }
+            }
+            for (Method method : objClass.getDeclaredMethods()){
+                try {
+                    boolean oldAccess = method.isAccessible();
+                    method.setAccessible(true);
+                    if (method.isAnnotationPresent(Configurable.class) && method.getParameterTypes().length == 0){
+                        Configurable configurable = method.getAnnotation(Configurable.class);
+                        if (configuration.getBoolean(method.getName(), configurable.category(), configurable.enabledByDefault(), configurable.comment())){
+                            method.invoke(o);
+                        }
+                    }
+                    method.setAccessible(oldAccess);
+                } catch (Throwable t) {
+                    throw new RuntimeException(t);
+                }
+            }
+        }
+
+        configuration.save();
     }
 
-    @Override
-    protected void postRegister() {
+    public static Configuration wrapCategoryAsConfig(Configuration configuration, String category){
+        return new CategoryAsConfig(category, configuration);
     }
 
-    private static final BiConsumer<ModConfig, CommentedConfig> setConfig;
-    private static final BiConsumer<ModContainer, ModConfig> sendLoadingEvent;
+    private final class CategoryData{
 
-    static {
-        MethodPointer<ModConfig, Void> setCfg = new MethodPointer<>(ModConfig.class, "setConfigData", CommentedConfig.class);
-        setConfig = setCfg::invoke;
-        ConstructorPointer<ModConfig.Loading> crt = new ConstructorPointer<>(ModConfig.Loading.class, ModConfig.class);
-        sendLoadingEvent = (mc, cfg) -> mc.dispatchConfigEvent(crt.newInstance(cfg));
+        private CategoryData(String category, String desc){
+            this.category = category;
+            this.desc = desc;
+        }
+
+        private final String category, desc;
+
+        private String getCategory(){
+            return this.category;
+        }
+
+        private String getDescription(){
+            return this.desc;
+        }
+
     }
-
 }

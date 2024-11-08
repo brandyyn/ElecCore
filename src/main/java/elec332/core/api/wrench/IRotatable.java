@@ -1,16 +1,13 @@
 package elec332.core.api.wrench;
 
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
 
 /**
  * Created by Elec332 on 7-2-2015.
  */
 public interface IRotatable {
+    public ForgeDirection getFacing();
 
-    Direction getFacing();
-
-    boolean rotateBlock(World world, BlockPos pos, Direction sideHit);
-
+    public Boolean rotateBlock(World world, int x, int y, int z);
 }

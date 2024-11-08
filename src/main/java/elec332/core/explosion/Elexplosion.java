@@ -1,19 +1,16 @@
 package elec332.core.explosion;
 
+import elec332.core.util.BlockLoc;
 import elec332.core.world.WorldHelper;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
 /**
  * Created by Elec332 on 13-8-2015.
- * <p>
- * Default implementation of {@link AbstractExplosion}
  */
-public class Elexplosion extends AbstractExplosion {
+public class Elexplosion extends AbstractExplosion{
 
     public Elexplosion(World world, Entity entity, double x, double y, double z, float size) {
         super(world, entity, x, y, z, size);
@@ -21,7 +18,7 @@ public class Elexplosion extends AbstractExplosion {
 
     @Override
     protected void preExplode() {
-        damageEntities(getRadius() * 1.5f, getRadius());
+        damageEntities(getRadius()*1.5f, getRadius());
     }
 
     @Override
@@ -30,14 +27,13 @@ public class Elexplosion extends AbstractExplosion {
             for (int x = (int) -this.getRadius(); x < this.getRadius(); x++) {
                 for (int y = (int) -this.getRadius(); y < this.getRadius(); y++) {
                     for (int z = (int) -this.getRadius(); z < this.getRadius(); z++) {
-                        BlockPos targetPosition = this.getLocation().add(x, y, z);
-                        double dist = Math.sqrt(getLocation().distanceSq(targetPosition));
+                        BlockLoc targetPosition = this.getLocation().copy().translate(new BlockLoc(x, y, z));
+                        double dist = getLocation().distance(targetPosition);
                         if (dist < this.getRadius()) {
-                            BlockState state = WorldHelper.getBlockState(getWorld(), targetPosition);
-                            Block block = state.getBlock();
-                            if (block != null && !block.isAir(state, getWorld(), targetPosition) && state.getBlockHardness(getWorld(), targetPosition.toImmutable()) >= 0) {
+                            Block block = WorldHelper.getBlockAt(getWorld(), targetPosition);
+                            if (block != null && !block.isAir(getWorld(), x, y, x) && block != Blocks.bedrock) {
                                 if (dist < this.getRadius() - 1 || getWorld().rand.nextFloat() > 0.7) {
-                                    getWorld().setBlockState(targetPosition, Blocks.AIR.getDefaultState(), 3);
+                                    getWorld().setBlockToAir(targetPosition.xCoord, targetPosition.yCoord, targetPosition.zCoord);
                                 }
                             }
                         }
@@ -51,5 +47,4 @@ public class Elexplosion extends AbstractExplosion {
     protected void postExplode() {
 
     }
-
 }

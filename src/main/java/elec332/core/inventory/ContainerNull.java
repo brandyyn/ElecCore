@@ -1,23 +1,15 @@
 package elec332.core.inventory;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.inventory.container.Container;
-
-import javax.annotation.Nonnull;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.Container;
 
 /**
  * Created by Elec332 on 11-10-2015.
- * <p>
- * Null/fake container
  */
 public final class ContainerNull extends Container {
 
-    public ContainerNull() {
-        super(null, -1);
-    }
-
     @Override
-    public boolean canInteractWith(@Nonnull PlayerEntity player) {
+    public boolean canInteractWith(EntityPlayer player) {
         return false;
     }
 
