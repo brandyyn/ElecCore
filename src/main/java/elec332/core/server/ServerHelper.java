@@ -292,7 +292,13 @@ public class ServerHelper {
             } catch (EOFException e) {
                 ElecCore.logger.error("Error reading NBT files, something weird must have happened when you last shutdown MC, unfortunately, some game data will be lost. Fixing file now....");
                 String date = Calendar.getInstance().getTime().toString();
-                String ext = file.getName().split(".")[1];
+                String ext;
+                if (file.getName().split(".").length > 1) {
+                     ext = file.getName().split(".")[1];
+                }
+                else {
+                     ext = "txt";
+                }
                 File newFile = new File(file.getCanonicalPath().replace(ext, "-" + date + ext));
                 FileUtils.moveFile(file, newFile);
                 //if (!file.delete()){
